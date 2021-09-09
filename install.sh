@@ -48,8 +48,8 @@ ICU_ARCHIVE="icu4c-55_2-src.tgz"
 
 # Boost archive.
 #------------------------------------------------------------------------------
-BOOST_URL="http://downloads.sourceforge.net/project/boost/boost/1.72.0/boost_1_72_0.tar.bz2"
-BOOST_ARCHIVE="boost_1_72_0.tar.bz2"
+BOOST_URL="https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_1_77_0.tar.bz2"
+BOOST_ARCHIVE="boost_1_77_0.tar.bz2"
 
 
 # Define utility functions.
@@ -71,7 +71,7 @@ configure_options()
         fi
     done
 
-    ./configure "$@"
+    ./configure "$@" "--prefix="$PREFIX"" "--exec-prefix="$PREFIX""
 }
 
 create_directory()
@@ -80,6 +80,12 @@ create_directory()
 
     rm -rf "$DIRECTORY"
     mkdir "$DIRECTORY"
+}
+
+create_directory_non_destructive()
+{
+    local DIRECTORY="$1"
+    mkdir -p "$DIRECTORY"
 }
 
 display_heading_message()
@@ -361,9 +367,6 @@ set_os_specific_compiler_settings "$@"
 link_to_standard_library
 normalize_static_and_shared_options "$@"
 remove_build_options
-set_prefix
-set_pkgconfigdir
-set_with_boost_prefix
 
 display_configuration()
 {
@@ -431,10 +434,16 @@ SECP256K1_OPTIONS=(
 
 # Define bitcoin-system options.
 #------------------------------------------------------------------------------
-BITCOIN_SYSTEM_OPTIONS=(
-"${with_boost}" \
-"${with_pkgconfigdir}")
+update_prefix_options()
+{
+    set_prefix
+    set_pkgconfigdir
+    set_with_boost_prefix
 
+    BITCOIN_SYSTEM_OPTIONS=(
+        "${with_boost}" \
+        "${with_pkgconfigdir}")
+}
 
 # Define build functions.
 #==============================================================================
@@ -602,17 +611,20 @@ build_from_tarball_boost()
         return
     fi
 
-    display_heading_message "Download $ARCHIVE"
-
     # Use the suffixed archive name as the extraction directory.
     local EXTRACT="build-$ARCHIVE"
     push_directory "$BUILD_DIR"
-    create_directory "$EXTRACT"
+    create_directory_non_destructive "$EXTRACT"
     push_directory "$EXTRACT"
 
-    # Extract the source locally.
-    wget --output-document "$ARCHIVE" "$URL"
-    tar --extract --file "$ARCHIVE" "--$COMPRESSION" --strip-components=1
+    if [[ ! -f "bootstrap.sh" ]]; then
+        # Download source
+        display_heading_message "Download $ARCHIVE"
+        # wget --output-document "$ARCHIVE" "$URL"
+        cp "/Users/madrazzl3/$ARCHIVE" "$ARCHIVE"
+        # Extract the source locally.
+        tar --extract --file "$ARCHIVE" "--$COMPRESSION" --strip-components=1
+    fi
 
     initialize_boost_configuration
     initialize_boost_icu_configuration
@@ -651,7 +663,6 @@ build_from_tarball_boost()
     ./b2 install \
         "variant=release" \
         "threading=multi" \
-        "$BOOST_TOOLSET" \
         "$BOOST_CXXFLAGS" \
         "$BOOST_LINKFLAGS" \
         "link=$BOOST_LINK" \
@@ -664,6 +675,7 @@ build_from_tarball_boost()
         "-q" \
         "--reconfigure" \
         "--prefix=$PREFIX" \
+        "--build-dir=../boost-bin/$TARGET_CONFIGURATION" \
         "$@"
 
     pop_directory
@@ -687,8 +699,10 @@ build_from_github()
     FORK="$ACCOUNT/$REPO"
     display_heading_message "Download $FORK/$BRANCH"
 
-    # Clone the repository locally.
-    git clone --depth 1 --branch "$BRANCH" --single-branch "https://github.com/$FORK"
+    if [[ ! -d $REPO ]]; then
+        # Clone the repository locally.
+        git clone --depth 1 --branch "$BRANCH" --single-branch "https://github.com/$FORK"
+    fi
 
     # Join generated and command line options.
     local CONFIGURATION=("${OPTIONS[@]}" "$@")
@@ -741,22 +755,203 @@ build_from_travis()
     fi
 }
 
+build_mac()
+{
+    echo
+    echo "======BUILDING FOR MAC======"
+    echo
+
+    local SAVE_PREFIX="$PREFIX"
+
+    ./config-generator.py "/Users/madrazzl3/" "macos" "x64"
+
+    export TARGET_CONFIGURATION="MacOS/x64"
+    export PREFIX="$PREFIX/$TARGET_CONFIGURATION"
+
+    ADDITIONAL_ARGS=(
+        "toolset=clang" \
+    )
+
+    build_from_tarball "$ICU_URL" "$ICU_ARCHIVE" gzip source "$PARALLEL" "$BUILD_ICU" "${ICU_OPTIONS[@]}" "$@"
+    build_from_tarball_boost "$BOOST_URL" "$BOOST_ARCHIVE" bzip2 . "$PARALLEL" "$BUILD_BOOST" "${BOOST_OPTIONS[@]}" "${ADDITIONAL_ARGS[@]}"
+    build_from_github libbitcoin secp256k1 version7 "$PARALLEL" "${SECP256K1_OPTIONS[@]}" "$@"
+    build_from_travis libbitcoin libbitcoin-system master "$PARALLEL" "${BITCOIN_SYSTEM_OPTIONS[@]}" "$@"
+
+    export PREFIX="$SAVE_PREFIX"
+}
+
+build_android()
+{
+    echo
+    echo "======BUILDING FOR ANDROID======"
+    echo
+
+    local TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/darwin-x86_64
+
+    # # Set this to your minSdkVersion.
+    local API=21
+
+    # Configure and build.
+
+    local SAVE_AR="$AR"
+    local SAVE_AS="$AS"
+    local SAVE_LD="$LD"
+    local SAVE_RANLIB="$RANLIB"
+    local SAVE_STRIP="$STRIP"
+    local SAVE_CFLAGS="$CFLAGS"
+    local SAVE_CXXFLAGS="$CXXFLAGS"
+    local SAVE_LDFLAGS="$LDFLAGS"
+
+    export AR=$TOOLCHAIN/bin/llvm-ar
+    export AS=$CC
+    export LD=$TOOLCHAIN/bin/ld
+    export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+    export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+    HOST_FLAGS="-isysroot=$TOOLCHAIN/"
+
+    export CFLAGS="${HOST_FLAGS}"
+    export CXXFLAGS="${HOST_FLAGS}"
+    export LDFLAGS="${HOST_FLAGS}"
+
+    export LOCAL_LDLIBS="-ldl"
+    export LD_DEBUG="all"
+    export LDADD="-ldl"
+
+    local SAVE_PREFIX="$PREFIX"
+
+    ANDROID_ARCHLIST="arm64 arm32 x86 x64"
+    ANDROID_TARGETS=("aarch64-linux-android" "armv7a-linux-androideabi" "i686-linux-android" "x86_64-linux-android")
+
+    ITER=0
+    for ARCH in $ANDROID_ARCHLIST; do
+
+        ./config-generator.py "/Users/madrazzl3/" "android" "$ARCH"
+
+        export TARGET_CONFIGURATION="Android/$ARCH"
+        export PREFIX="$PREFIX/$TARGET_CONFIGURATION"
+
+        local TARGET="${ANDROID_TARGETS[ITER]}"
+
+        local SAVE_CC="$CC"
+        local SAVE_CXX="$CXX"
+
+        export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+        export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+
+        ADDITIONAL_ARGS=(
+            "target-os=android" \
+            "toolset=clang-android$ARCH" \
+        )
+
+        update_prefix_options
+
+        build_from_tarball "$ICU_URL" "$ICU_ARCHIVE" gzip source "$PARALLEL" "$BUILD_ICU" "${ICU_OPTIONS[@]}" "$@"
+        build_from_tarball_boost "$BOOST_URL" "$BOOST_ARCHIVE" bzip2 . "$PARALLEL" "$BUILD_BOOST" "${BOOST_OPTIONS[@]}" "${ADDITIONAL_ARGS[@]}"
+        build_from_github libbitcoin secp256k1 version7 "$PARALLEL" "${SECP256K1_OPTIONS[@]}" "$@" "--host="$TARGET""
+        build_from_travis libbitcoin libbitcoin-system master "$PARALLEL" "${BITCOIN_SYSTEM_OPTIONS[@]}" "$@" "--host="$TARGET""
+
+        ITER=$(expr $ITER + 1)
+
+        export CXX="$SAVE_CXX"
+        export CC="$SAVE_CC"
+        export PREFIX="$SAVE_PREFIX"
+    done
+
+    export LDFLAGS="$SAVE_LDFLAGS"
+    export CXXFLAGS="$SAVE_CXXFLAGS"
+    export CFLAGS="$SAVE_CFLAGS"
+
+    export STRIP="$SAVE_STRIP"
+    export RANLIB="$SAVE_RANLIB"
+    export LD="$SAVE_LD"
+    export AS="$SAVE_AS"
+    export AR="$SAVE_AR"
+}
+
+build_ios()
+{
+    echo
+    echo "======BUILDING FOR IOS======"
+    echo
+
+    local SAVE_PREFIX="$PREFIX"
+    export PREFIX="$PREFIX/iOS/arm64"
+
+    ./config-generator.py "/Users/madrazzl3/" "ios" "arm64"
+
+    local SAVE_CC="$CC"
+    local SAVE_CXX="$CXX"
+    local SAVE_CPP="$CPP"
+    local SAVE_CFLAGS="$CFLAGS"
+    local SAVE_CXXFLAGS="$CXXFLAGS"
+    local SAVE_LDFLAGS="$LDFLAGS"
+
+    OPT_FLAGS="-fembed-bitcode"
+    MIN_IOS_VERSION=12.0
+
+    SDK="iphoneos"
+    PLATFORM="arm"
+    ARCH_FLAGS="-arch arm64 -arch arm64e"
+    HOST_FLAGS="${ARCH_FLAGS} -miphoneos-version-min=${MIN_IOS_VERSION} -isysroot $(xcrun --sdk ${SDK} --show-sdk-path)"
+    CHOST="arm-apple-darwin"
+
+    export CC=$(xcrun --find --sdk "${SDK}" clang)
+    export CXX=$(xcrun --find --sdk "${SDK}" clang++)
+    export CPP=$(xcrun --find --sdk "${SDK}" cpp)
+    export CFLAGS="${HOST_FLAGS} ${OPT_FLAGS}"
+    export CXXFLAGS="${HOST_FLAGS} ${OPT_FLAGS}"
+    export LDFLAGS="${HOST_FLAGS}"
+
+    ADDITIONAL_ARGS=(
+            "toolset=darwin-ios" \
+            "target-os=iphone" \
+            "address-model=64" \
+            "instruction-set=arm64" \
+            "architecture=arm" \
+            "binary-format=mach-o" \
+            "abi=aapcs" \
+            "define=_LITTLE_ENDIAN" \
+            "define=BOOST_TEST_NO_MAIN" \
+        )
+
+    update_prefix_options
+
+    build_from_tarball "$ICU_URL" "$ICU_ARCHIVE" gzip source "$PARALLEL" "$BUILD_ICU" "${ICU_OPTIONS[@]}" "$@" "--host="${CHOST}""
+    build_from_tarball_boost "$BOOST_URL" "$BOOST_ARCHIVE" bzip2 . "$PARALLEL" "$BUILD_BOOST" "${BOOST_OPTIONS[@]}" "${ADDITIONAL_ARGS[@]}"
+    build_from_github libbitcoin secp256k1 version7 "$PARALLEL" "${SECP256K1_OPTIONS[@]}" "$@" "--host="${CHOST}""
+    build_from_travis libbitcoin libbitcoin-system master "$PARALLEL" "${BITCOIN_SYSTEM_OPTIONS[@]}" "$@" "--host="${CHOST}""
+
+    export LDFLAGS="$SAVE_LDFLAGS"
+    export CXXFLAGS="$SAVE_CXXFLAGS"
+    export CFLAGS="$SAVE_CFLAGS"
+    export CPP="$SAVE_CPP"
+    export CXX="$SAVE_CXX"
+    export CC="$SAVE_CC"
+
+    PREFIX="$SAVE_PREFIX"
+}
+
+build_linux()
+{
+    echo "TODO implement linux pipeline"
+}
 
 # The master build function.
 #==============================================================================
 build_all()
 {
-    build_from_tarball "$ICU_URL" "$ICU_ARCHIVE" gzip source "$PARALLEL" "$BUILD_ICU" "${ICU_OPTIONS[@]}" "$@"
-    build_from_tarball_boost "$BOOST_URL" "$BOOST_ARCHIVE" bzip2 . "$PARALLEL" "$BUILD_BOOST" "${BOOST_OPTIONS[@]}"
-    build_from_github libbitcoin secp256k1 version7 "$PARALLEL" "${SECP256K1_OPTIONS[@]}" "$@"
-    build_from_travis libbitcoin libbitcoin-system master "$PARALLEL" "${BITCOIN_SYSTEM_OPTIONS[@]}" "$@"
+    build_mac "$@"
+    build_android "$@"
+    build_ios "$@"
+    build_linux "$@"
 }
 
 
 # Build the primary library and all dependencies.
 #==============================================================================
 display_configuration
-create_directory "$BUILD_DIR"
+create_directory_non_destructive "$BUILD_DIR"
 push_directory "$BUILD_DIR"
 initialize_git
 pop_directory
