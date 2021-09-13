@@ -27,3 +27,5 @@ obj
 .dirstamp
 
 .DS_Store
+.vscode
+*.lnk
