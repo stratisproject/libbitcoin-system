@@ -1,0 +1,7 @@
+import os ;
+local COMPILER = [ os.environ CXX ] ;
+
+using clang : aarch64.linux.android : $(COMPILER) ;
+using clang : armv7a.linux.androideabi : $(COMPILER) ;
+using clang : i686.linux.android : $(COMPILER) ;
+using clang : x86.64.linux.android : $(COMPILER) ;
