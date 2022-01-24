@@ -19,6 +19,7 @@
 #ifndef LIBBITCOIN_SYSTEM_WALLET_DICTIONARY_HPP
 #define LIBBITCOIN_SYSTEM_WALLET_DICTIONARY_HPP
 
+#include <cstddef>
 #include <array>
 #include <vector>
 #include <bitcoin/system/compat.hpp>
