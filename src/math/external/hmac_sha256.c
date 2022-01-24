@@ -44,9 +44,9 @@ void HMACSHA256Final(HMACSHA256CTX* context,
 {
     uint8_t hash[HMACSHA256_DIGEST_LENGTH];
 
-    SHA256Final(&context->ictx, hash);
-    SHA256Update(&context->octx, hash, HMACSHA256_DIGEST_LENGTH);
-    SHA256Final(&context->octx, digest);
+    internalSHA256Final(&context->ictx, hash);
+    internalSHA256Update(&context->octx, hash, HMACSHA256_DIGEST_LENGTH);
+    internalSHA256Final(&context->octx, digest);
 
     zeroize((void*)hash, sizeof hash);
 }
@@ -60,32 +60,32 @@ void HMACSHA256Init(HMACSHA256CTX* context, const uint8_t* key,
 
     if (key_length > SHA256_BLOCK_LENGTH)
     {
-        SHA256Init(&context->ictx);
-        SHA256Update(&context->ictx, key, key_length);
-        SHA256Final(&context->ictx, key_hash);
+        internalSHA256Init(&context->ictx);
+        internalSHA256Update(&context->ictx, key, key_length);
+        internalSHA256Final(&context->ictx, key_hash);
         key = key_hash;
         key_length = SHA256_DIGEST_LENGTH;
     }
 
-    SHA256Init(&context->ictx);
+    internalSHA256Init(&context->ictx);
     fill(pad, SHA256_BLOCK_LENGTH, 0x36);
 
     for (i = 0; i < key_length; i++) 
         pad[i] ^= key[i];
 
-    SHA256Update(&context->ictx, pad, SHA256_BLOCK_LENGTH);
-    SHA256Init(&context->octx);
+    internalSHA256Update(&context->ictx, pad, SHA256_BLOCK_LENGTH);
+    internalSHA256Init(&context->octx);
     fill(pad, SHA256_BLOCK_LENGTH, 0x5c);
 
     for (i = 0; i < key_length; i++) 
         pad[i] ^= key[i];
 
-    SHA256Update(&context->octx, pad, SHA256_BLOCK_LENGTH);
+    internalSHA256Update(&context->octx, pad, SHA256_BLOCK_LENGTH);
     zeroize((void*)key_hash, sizeof key_hash);
 }
 
 void HMACSHA256Update(HMACSHA256CTX* context, const uint8_t* input,
     size_t length)
 {
-    SHA256Update(&context->ictx, input, length);
+    internalSHA256Update(&context->ictx, input, length);
 }

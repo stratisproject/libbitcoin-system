@@ -45,12 +45,12 @@ void SHA1_(const uint8_t* message, size_t length,
     uint8_t digest[SHA1_DIGEST_LENGTH])
 {
     SHA1CTX context;
-    SHA1Init(&context);
-    SHA1Update(&context, message, length);
-    SHA1Final(&context, digest);
+    internalSHA1Init(&context);
+    internalSHA1Update(&context, message, length);
+    internalSHA1Final(&context, digest);
 }
 
-void SHA1Init(SHA1CTX* context)
+void internalSHA1Init(SHA1CTX* context)
 {
     context->state[0] = 0x67452301;
     context->state[1] = 0xEFCDAB89;
@@ -61,7 +61,7 @@ void SHA1Init(SHA1CTX* context)
     context->index = 0;
 }
 
-void SHA1Update(SHA1CTX* context, const uint8_t* message, size_t length)
+void internalSHA1Update(SHA1CTX* context, const uint8_t* message, size_t length)
 {
     /* Guard against overflow in while loop (returns digest of empty message). */
     if (length > SIZE_MAX / 8)
@@ -81,7 +81,7 @@ void SHA1Update(SHA1CTX* context, const uint8_t* message, size_t length)
     }
 }
 
-void SHA1Final(SHA1CTX* context, uint8_t digest[SHA1_DIGEST_LENGTH])
+void internalSHA1Final(SHA1CTX* context, uint8_t digest[SHA1_DIGEST_LENGTH])
 {
     size_t i;
 

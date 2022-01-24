@@ -44,9 +44,9 @@ void HMACSHA512Final(HMACSHA512CTX* context,
 {
     uint8_t hash[HMACSHA512_DIGEST_LENGTH];
 
-    SHA512Final(&context->ictx, hash);
-    SHA512Update(&context->octx, hash, HMACSHA512_DIGEST_LENGTH);
-    SHA512Final(&context->octx, digest);
+    internalSHA512Final(&context->ictx, hash);
+    internalSHA512Update(&context->octx, hash, HMACSHA512_DIGEST_LENGTH);
+    internalSHA512Final(&context->octx, digest);
 
     zeroize((void*)hash, sizeof hash);
 }
@@ -60,32 +60,32 @@ void HMACSHA512Init(HMACSHA512CTX* context, const uint8_t* key,
 
     if (key_length > SHA512_BLOCK_LENGTH)
     {
-        SHA512Init(&context->ictx);
-        SHA512Update(&context->ictx, key, key_length);
-        SHA512Final(&context->ictx, key_hash);
+        internalSHA512Init(&context->ictx);
+        internalSHA512Update(&context->ictx, key, key_length);
+        internalSHA512Final(&context->ictx, key_hash);
         key = key_hash;
         key_length = SHA512_DIGEST_LENGTH;
     }
 
-    SHA512Init(&context->ictx);
+    internalSHA512Init(&context->ictx);
     fill(pad, SHA512_BLOCK_LENGTH, 0x36);
 
     for (i = 0; i < key_length; i++) 
         pad[i] ^= key[i];
 
-    SHA512Update(&context->ictx, pad, SHA512_BLOCK_LENGTH);
-    SHA512Init(&context->octx);
+    internalSHA512Update(&context->ictx, pad, SHA512_BLOCK_LENGTH);
+    internalSHA512Init(&context->octx);
     fill(pad, SHA512_BLOCK_LENGTH, 0x5c);
 
     for (i = 0; i < key_length; i++) 
         pad[i] ^= key[i];
 
-    SHA512Update(&context->octx, pad, SHA512_BLOCK_LENGTH);
+    internalSHA512Update(&context->octx, pad, SHA512_BLOCK_LENGTH);
     zeroize((void*)key_hash, sizeof key_hash);
 }
 
 void HMACSHA512Update(HMACSHA512CTX* context, const uint8_t* input,
     size_t length)
 {
-    SHA512Update(&context->ictx, input, length);
+    internalSHA512Update(&context->ictx, input, length);
 }

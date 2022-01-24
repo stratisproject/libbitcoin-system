@@ -98,10 +98,10 @@ hash_digest sha256_hash(const data_slice& first, const data_slice& second)
 {
     hash_digest hash;
     SHA256CTX context;
-    SHA256Init(&context);
-    SHA256Update(&context, first.data(), first.size());
-    SHA256Update(&context, second.data(), second.size());
-    SHA256Final(&context, hash.data());
+    internalSHA256Init(&context);
+    internalSHA256Update(&context, first.data(), first.size());
+    internalSHA256Update(&context, second.data(), second.size());
+    internalSHA256Final(&context, hash.data());
     return hash;
 }
 
