@@ -4,6 +4,7 @@
 *.lo
 *.o
 *.pyc
+*.pc
 Makefile
 Makefile.in
 libbitcoin.pc
@@ -17,10 +18,12 @@ obj
 /.project
 /.settings
 /nbproject
+*.log
 
 /aclocal.m4
 /autom4te.cache
 /build-aux
+/dependencies
 /config.*
 /configure
 /libtool
