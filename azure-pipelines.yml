@@ -1,0 +1,55 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger: none
+
+jobs:
+  - job: Build
+    displayName: "Build libbitcoin-system for different architectures"
+    strategy:
+      matrix:
+        arm64:
+          ARCH: "aarch64-linux-android"
+        arm32:
+          ARCH: "armv7a-linux-androideabi"
+        x86:
+          ARCH: "i686-linux-android"
+        x86-64:
+          ARCH: "x86_64-linux-android"
+      maxParallel: 4
+    steps:
+      - script: |
+          BUILD_TOOLS="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+          RESULT_PATH="$(Agent.TempDirectory)/$ARCH"
+          BUILD_DIR="$(Agent.TempDirectory)/$ARCH"
+
+          ANDROID_API=28
+
+          export CC="$BUILD_TOOLS/$ARCH$ANDROID_API-clang"
+          export CXX="$BUILD_TOOLS/$ARCH$ANDROID_API-clang++"
+
+          PLATFORM_TOOLSET=`echo $ARCH | tr "_-" "."`
+          export BOOST_TOOLSET="clang-$PLATFORM_TOOLSET"
+          export BOOST_CUSTOM_OPTIONS="target-os=android"
+          export CUSTOM_CONFIGURE_OPTIONS="--host=$ARCH"
+
+          cp android-user-config.jam $HOME/user-config.jam
+
+          bash ./build.sh --prefix="$RESULT_PATH" --build-dir="$BUILD_DIR" --with-examples=no
+        displayName: "Run a build script"
+      - task: CopyFiles@2
+        displayName: "Copy static libraries to: $(Build.ArtifactStagingDirectory)/$(ARCH)"
+        inputs:
+          SourceFolder: "$(Agent.TempDirectory)/$(ARCH)/lib"
+          Contents: "*.a"
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/$(ARCH)"
+      - task: PublishBuildArtifacts@1
+        displayName: "Publish static libraries"
+        inputs:
+          PathtoPublish: "$(Build.ArtifactStagingDirectory)/$(ARCH)"
+          ArtifactName: "libbitcoin-system-$(ARCH)"
+          publishLocation: "Container"
+          StoreAsTar: true
