@@ -47,7 +47,7 @@ jobs:
       - task: CopyFiles@2
         displayName: "Copy static libraries to: $(Build.ArtifactStagingDirectory)/$(SDK)"
         inputs:
-          SourceFolder: "$(Agent.TempDirectory)/$(SDK)/lib"
+          SourceFolder: "$(Agent.TempDirectory)/result/$(SDK)/lib"
           Contents: "*.a"
           TargetFolder: "$(Build.ArtifactStagingDirectory)/$(SDK)"
       - task: PublishBuildArtifacts@1
