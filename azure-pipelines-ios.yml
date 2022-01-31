@@ -1,0 +1,54 @@
+trigger: none
+
+jobs:
+  - job: Build
+    displayName: "Build libbitcoin-system"
+    strategy:
+      matrix:
+        device:
+          ARCH: "aarch64-linux-android"
+          SDK: "iphoneos"
+          ARCH_FLAGS: "-arch arm64 -arch arm64e"
+          BOOST_TOOLSET: "darwin-ios"
+          CUSTOM_CONFIGURE_OPTIONS: "--host=arm-apple-darwin"
+        simulator:
+          SDK: "iphonesimulator"
+          ARCH_FLAGS: "-arch x86_64"
+          BOOST_TOOLSET: "darwin-iossim"
+          CUSTOM_CONFIGURE_OPTIONS: "--host=x86_64-apple-darwin"
+      maxParallel: 2
+    steps:
+      - script: |
+          RESULT_PATH="$(Agent.TempDirectory)/$SDK"
+          BUILD_DIR="$(Agent.TempDirectory)/$SDK"
+
+          cp ios-user-config.jam $HOME/user-config.jam
+
+          MIN_IOS_VERSION=14.0
+
+          export BOOST_CUSTOM_OPTIONS=""
+
+          export CC=$(xcrun --find --sdk "${SDK}" clang)
+          export CXX=$(xcrun --find --sdk "${SDK}" clang++)
+
+          export SDK_PATH=$(xcrun --sdk "${SDK}" --show-sdk-path)
+
+          export CFLAGS="${ARCH_FLAGS} -miphoneos-version-min=${MIN_IOS_VERSION} -isysroot ${SDK_PATH} -fembed-bitcode"
+          export CXXFLAGS="${CFLAGS}"
+          export LDFLAGS="${CFLAGS}"
+
+          bash ./build.sh --prefix="$RESULT_PATH/$SDK" --build-dir="$BUILD_DIR/$SDK" --with-examples=no 2>&1 | tee build-$SDK.log
+        displayName: "Run a build script"
+      - task: CopyFiles@2
+        displayName: "Copy static libraries to: $(Build.ArtifactStagingDirectory)/$(SDK)"
+        inputs:
+          SourceFolder: "$(Agent.TempDirectory)/$(SDK)/lib"
+          Contents: "*.a"
+          TargetFolder: "$(Build.ArtifactStagingDirectory)/$(SDK)"
+      - task: PublishBuildArtifacts@1
+        displayName: "Publish static libraries"
+        inputs:
+          PathtoPublish: "$(Build.ArtifactStagingDirectory)/$(SDK)"
+          ArtifactName: "libbitcoin-system-$(SDK)"
+          publishLocation: "Container"
+          StoreAsTar: true
