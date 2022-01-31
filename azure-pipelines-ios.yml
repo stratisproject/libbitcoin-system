@@ -24,8 +24,8 @@ jobs:
       - script: |
           brew install autoconf automake libtool pkgconfig wget
           
-          RESULT_PATH="$(Agent.TempDirectory)/$SDK"
-          BUILD_DIR="$(Agent.TempDirectory)/$SDK"
+          RESULT_PATH="$(Agent.TempDirectory)/result/$SDK"
+          BUILD_DIR="$(Agent.TempDirectory)/build/$SDK"
 
           cp ios-user-config.jam $HOME/user-config.jam
 
@@ -42,7 +42,7 @@ jobs:
           export CXXFLAGS="${CFLAGS}"
           export LDFLAGS="${CFLAGS}"
 
-          bash ./build.sh --prefix="$RESULT_PATH/$SDK" --build-dir="$BUILD_DIR/$SDK" --with-examples=no 2>&1 | tee build-$SDK.log
+          bash ./build.sh --prefix="$RESULT_PATH" --build-dir="$BUILD_DIR" --with-examples=no 2>&1 | tee build-$SDK.log
         displayName: "Run a build script"
       - task: CopyFiles@2
         displayName: "Copy static libraries to: $(Build.ArtifactStagingDirectory)/$(SDK)"
