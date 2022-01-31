@@ -1,0 +1,16 @@
+import os ;
+local COMPILER = [ os.environ CXX ] ;
+
+using darwin : ios : $(COMPILER)
+: <architecture>arm <target-os>iphone 
+<address-model>64
+<cxxflags>"$CXXFLAGS"
+<linkflags>"$LDFLAGS"
+;
+
+using darwin : iossim : $(COMPILER)
+: <architecture>x86 <target-os>iphone 
+<address-model>64
+<cxxflags>"$CXXFLAGS"
+<linkflags>"$LDFLAGS"
+;
