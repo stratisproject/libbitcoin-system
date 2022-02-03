@@ -38,7 +38,7 @@ jobs:
 
           export SDK_PATH=$(xcrun --sdk "${SDK}" --show-sdk-path)
 
-          export CFLAGS="${ARCH_FLAGS} -miphoneos-version-min=${MIN_IOS_VERSION} -isysroot ${SDK_PATH} -fembed-bitcode"
+          export CFLAGS="${ARCH_FLAGS} -miphoneos-version-min=${MIN_IOS_VERSION} -isysroot ${SDK_PATH} -fembed-bitcode -Os"
           export CXXFLAGS="${CFLAGS}"
           export LDFLAGS="${CFLAGS}"
 
